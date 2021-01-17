@@ -1,0 +1,1 @@
+<canvas id="gl" type="webgl" onReady="onCanvasReady" style="width: 100vw;height: 100vh; display: block;"></canvas>
