@@ -45032,73 +45032,54 @@ class Blob {
 
 }
 
-// Converts an ArrayBuffer directly to base64, without any intermediate 'convert to string then
-// use window.btoa' step. According to my tests, this appears to be a faster approach:
-// http://jsperf.com/encoding-xhr-image-data/5
-
 /*
-MIT LICENSE
+ * base64-arraybuffer
+ * https://github.com/niklasvh/base64-arraybuffer
+ *
+ * Copyright (c) 2012 Niklas von Hertzen
+ * Licensed under the MIT license.
+ */
 
-Copyright 2011 Jon Leighton
+var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+// Use a lookup table to find the index.
+var lookup = new Uint8Array(256);
+for (var i = 0; i < chars.length; i++) {
+  lookup[chars.charCodeAt(i)] = i;
+}
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+function decode(base64) {
+  var bufferLength = base64.length * 0.75,
+    len = base64.length,
+    i,
+    p = 0,
+    encoded1,
+    encoded2,
+    encoded3,
+    encoded4;
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-function ArrayBufferToBase64(arrayBuffer) {
-  var base64 = '';
-  var encodings =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
-  var bytes = new Uint8Array(arrayBuffer);
-  var byteLength = bytes.byteLength;
-  var byteRemainder = byteLength % 3;
-  var mainLength = byteLength - byteRemainder;
-
-  var a, b, c, d;
-  var chunk;
-
-  // Main loop deals with bytes in chunks of 3
-  for (var i = 0; i < mainLength; i = i + 3) {
-    // Combine the three bytes into a single integer
-    chunk = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
-
-    // Use bitmasks to extract 6-bit segments from the triplet
-    a = (chunk & 16515072) >> 18; // 16515072 = (2^6 - 1) << 18
-    b = (chunk & 258048) >> 12; // 258048   = (2^6 - 1) << 12
-    c = (chunk & 4032) >> 6; // 4032     = (2^6 - 1) << 6
-    d = chunk & 63; // 63       = 2^6 - 1
-
-    // Convert the raw binary segments to the appropriate ASCII encoding
-    base64 += encodings[a] + encodings[b] + encodings[c] + encodings[d];
+  if (base64[base64.length - 1] === '=') {
+    bufferLength--;
+    if (base64[base64.length - 2] === '=') {
+      bufferLength--;
+    }
   }
 
-  // Deal with the remaining bytes and padding
-  if (byteRemainder == 1) {
-    chunk = bytes[mainLength];
+  var arraybuffer = new ArrayBuffer(bufferLength),
+    bytes = new Uint8Array(arraybuffer);
 
-    a = (chunk & 252) >> 2; // 252 = (2^6 - 1) << 2
+  for (i = 0; i < len; i += 4) {
+    encoded1 = lookup[base64.charCodeAt(i)];
+    encoded2 = lookup[base64.charCodeAt(i + 1)];
+    encoded3 = lookup[base64.charCodeAt(i + 2)];
+    encoded4 = lookup[base64.charCodeAt(i + 3)];
 
-    // Set the 4 least significant bits to zero
-    b = (chunk & 3) << 4; // 3   = 2^2 - 1
-
-    base64 += encodings[a] + encodings[b] + '==';
-  } else if (byteRemainder == 2) {
-    chunk = (bytes[mainLength] << 8) | bytes[mainLength + 1];
-
-    a = (chunk & 64512) >> 10; // 64512 = (2^6 - 1) << 10
-    b = (chunk & 1008) >> 4; // 1008  = (2^6 - 1) << 4
-
-    // Set the 2 least significant bits to zero
-    c = (chunk & 15) << 2; // 15    = 2^4 - 1
-
-    base64 += encodings[a] + encodings[b] + encodings[c] + '=';
+    bytes[p++] = (encoded1 << 2) | (encoded2 >> 4);
+    bytes[p++] = ((encoded2 & 15) << 4) | (encoded3 >> 2);
+    bytes[p++] = ((encoded3 & 3) << 6) | (encoded4 & 63);
   }
 
-  return base64;
+  return arraybuffer;
 }
 
 class $URL$1 {
@@ -45107,7 +45088,7 @@ class $URL$1 {
 
 		if (obj instanceof Blob) {
 
-			const base64 = ArrayBufferToBase64(obj.parts[0]);
+			const base64 = decode(obj.parts[0]);
 			const url = `data:${obj.options.type};base64,${base64}`;
 
       return url;
@@ -45414,12 +45395,11 @@ class $XMLHttpRequest$1 extends EventTarget {
       this.response = null;
 
       const onSuccess = ({ data, statusCode, header }) => {
-        // console.log('onSuccess', data)
-        if (responseType === 'arraybuffer') {
-          const enc = new TextEncoder();
-          data = enc.encode(data).buffer;
+
+        if (responseType === "arraybuffer") {
+          data = decode(data);
         }
-        // data = Uint8Array.from(data, function(c){return c.codePointAt(0);}).buffer
+
         statusCode = statusCode === undefined ? 200 : statusCode;
         if (typeof data !== "string" && !(data instanceof ArrayBuffer)) {
           try {
@@ -45502,7 +45482,7 @@ class $XMLHttpRequest$1 extends EventTarget {
           const fs = my.getFileSystemManager();
           fs.readFile({
             filePath: apFilePath,
-            // encoding: 'binary',
+            encoding: responseType === "arraybuffer" ? 'base64' : undefined,
             // encoding: 'arraybuffer', // 不写encoding默认ArrayBuffer
             success: onSuccess,
           });
@@ -49670,10 +49650,11 @@ Page({
 
 
     let animationMixer;
-    gltfLoader.loadAsync('https://threejs.org/examples/models/gltf/Duck/glTF-Embedded/Duck.gltf')
+    gltfLoader.loadAsync('https://dtmall-tel.alicdn.com/edgeComputingConfig/upload_models/1591673169101/RobotExpressive.glb')
       .then((gltf) => {
         gltf.scene.position.z = -5;
         scene.add(gltf.scene);
+        animationMixer = this.initAnimation(gltf);
       });
 
     let spritePlayer;
@@ -49737,6 +49718,36 @@ Page({
     };
 
     render();
+  },
+
+  initAnimation(gltf) {
+    var states = [
+      "Idle",
+      "Walking",
+      "Running",
+      "Dance",
+      "Death",
+      "Sitting",
+      "Standing",
+    ];
+    const emotes = ["Jump", "Yes", "No", "Wave", "Punch", "ThumbsUp"];
+    const mixer = new AnimationMixer(gltf.scene);
+    const actions = {};
+    for (var i = 0; i < gltf.animations.length; i++) {
+      var clip = gltf.animations[i];
+      var action = mixer.clipAction(clip);
+      actions[clip.name] = action;
+      if (emotes.indexOf(clip.name) >= 0 || states.indexOf(clip.name) >= 4) {
+        action.clampWhenFinished = true;
+        action.loop = LoopOnce;
+      }
+    }
+
+    // expressions
+    // const face = gltf.scene.getObjectByName("Head_2");
+    const activeAction = actions["Walking"];
+    activeAction.play();
+    return mixer
   },
 
   onUnload() {

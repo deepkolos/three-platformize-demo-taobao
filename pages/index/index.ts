@@ -42,10 +42,11 @@ Page({
 
 
     let animationMixer: AnimationMixer | undefined;
-    gltfLoader.loadAsync('https://threejs.org/examples/models/gltf/Duck/glTF-Embedded/Duck.gltf')
+    gltfLoader.loadAsync('https://dtmall-tel.alicdn.com/edgeComputingConfig/upload_models/1591673169101/RobotExpressive.glb')
       .then((gltf) => {
         gltf.scene.position.z = -5
         scene.add(gltf.scene);
+        animationMixer = this.initAnimation(gltf);
       })
 
     let spritePlayer: ThreeSpritePlayer | undefined;
@@ -109,6 +110,36 @@ Page({
     }
 
     render()
+  },
+
+  initAnimation(gltf: GLTF) {
+    var states = [
+      "Idle",
+      "Walking",
+      "Running",
+      "Dance",
+      "Death",
+      "Sitting",
+      "Standing",
+    ];
+    const emotes = ["Jump", "Yes", "No", "Wave", "Punch", "ThumbsUp"];
+    const mixer = new AnimationMixer(gltf.scene);
+    const actions: { [k: string]: AnimationAction } = {};
+    for (var i = 0; i < gltf.animations.length; i++) {
+      var clip = gltf.animations[i];
+      var action = mixer.clipAction(clip);
+      actions[clip.name] = action;
+      if (emotes.indexOf(clip.name) >= 0 || states.indexOf(clip.name) >= 4) {
+        action.clampWhenFinished = true;
+        action.loop = LoopOnce;
+      }
+    }
+
+    // expressions
+    // const face = gltf.scene.getObjectByName("Head_2");
+    const activeAction = actions["Walking"];
+    activeAction.play();
+    return mixer
   },
 
   onUnload() {
