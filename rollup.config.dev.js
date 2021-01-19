@@ -5,6 +5,7 @@ export default [
   {
     input: './pages/index/index.ts',
     treeshake: true,
+    cache: false,
     output: {
       format: 'esm',
       file: './pages/index/index.js'

@@ -262,46 +262,41 @@ let $createImageBitmap = null;
 let $requestAnimationFrame = null;
 
 class Platform {
+  set(platform) {
+    this.platform && this.platform.dispose();
 
-	set(platform) {
+    this.platform = platform;
 
-		this.platform && this.platform.dispose();
+    const globals = platform.getGlobals();
 
-		this.platform = platform;
-		
-		const globals = platform.getGlobals();
+    $atob = globals.atob;
+    $Blob = globals.Blob;
+    $window = globals.window;
+    $document = globals.document;
+    $XMLHttpRequest = globals.XMLHttpRequest;
+    $OffscreenCanvas = globals.OffscreenCanvas;
+    $HTMLCanvasElement = globals.HTMLCanvasElement;
+    $createImageBitmap = globals.createImageBitmap;
+    $requestAnimationFrame = $window.requestAnimationFrame;
+    $window.cancelAnimationFrame;
 
-		$atob = globals.atob;
-		$Blob = globals.Blob;
-		$window = globals.window;
-		$document = globals.document;
-		$XMLHttpRequest = globals.XMLHttpRequest;
-		$OffscreenCanvas = globals.OffscreenCanvas;
-		$HTMLCanvasElement = globals.HTMLCanvasElement;
-		$createImageBitmap = globals.createImageBitmap;
-		$requestAnimationFrame = globals.requestAnimationFrame;
-
-		$URL = globals.window.URL;
-
-	}
+    $URL = globals.window.URL;
+  }
 
   dispose() {
+    this.platform && this.platform.dispose();
 
-		this.platform && this.platform.dispose();
-
-		$URL = null;
-		$Blob = null;
-		$atob = null;
-		$window = null;
-		$document = null;
-		$XMLHttpRequest = null;
-		$OffscreenCanvas = null;
-		$HTMLCanvasElement = null;
-		$createImageBitmap = null;
-		$requestAnimationFrame = null;
-
-	}
-
+    $URL = null;
+    $Blob = null;
+    $atob = null;
+    $window = null;
+    $document = null;
+    $XMLHttpRequest = null;
+    $OffscreenCanvas = null;
+    $HTMLCanvasElement = null;
+    $createImageBitmap = null;
+    $requestAnimationFrame = null;
+  }
 }
 
 const PLATFORM = new Platform();
@@ -45015,21 +45010,17 @@ if ( typeof __THREE_DEVTOOLS__ !== 'undefined' ) {
 }
 
 class Blob {
-
-	constructor(parts, options) {
-
-		this.parts = parts;
+  constructor(parts, options) {
+    this.parts = parts;
     this.options = options;
 
     // 目前仅适配如下
-		// var blob = new Blob([bufferView], { type: source.mimeType });
+    // var blob = new Blob([bufferView], { type: source.mimeType });
     // sourceURI = URL.createObjectURL(blob);
 
-		// var base64 = ArrayBufferToBase64(bufferView);
+    // var base64 = ArrayBufferToBase64(bufferView);
     // var url = `data:${options.type};base64,${base64}`;
-
   }
-
 }
 
 /*
@@ -45046,6 +45037,28 @@ var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 var lookup = new Uint8Array(256);
 for (var i = 0; i < chars.length; i++) {
   lookup[chars.charCodeAt(i)] = i;
+}
+
+function encode(arraybuffer) {
+  var bytes = new Uint8Array(arraybuffer),
+    i,
+    len = bytes.length,
+    base64 = '';
+
+  for (i = 0; i < len; i += 3) {
+    base64 += chars[bytes[i] >> 2];
+    base64 += chars[((bytes[i] & 3) << 4) | (bytes[i + 1] >> 4)];
+    base64 += chars[((bytes[i + 1] & 15) << 2) | (bytes[i + 2] >> 6)];
+    base64 += chars[bytes[i + 2] & 63];
+  }
+
+  if (len % 3 === 2) {
+    base64 = base64.substring(0, base64.length - 1) + '=';
+  } else if (len % 3 === 1) {
+    base64 = base64.substring(0, base64.length - 2) + '==';
+  }
+
+  return base64;
 }
 
 function decode(base64) {
@@ -45083,23 +45096,18 @@ function decode(base64) {
 }
 
 class $URL$1 {
-
-	createObjectURL(obj) {
-
-		if (obj instanceof Blob) {
-
-			const base64 = decode(obj.parts[0]);
-			const url = `data:${obj.options.type};base64,${base64}`;
+  createObjectURL(obj) {
+    if (obj instanceof Blob) {
+      const base64 = encode(obj.parts[0]);
+      const url = `data:${obj.options.type};base64,${base64}`;
 
       return url;
+    }
 
-		}
+    return '';
+  }
 
-		return "";
-	}
-	
-	revokeObjectURL() {}
-
+  revokeObjectURL() {}
 }
 
 /**
@@ -45111,11 +45119,11 @@ function atob(data) {
   // ToString, which in our case amounts to using a template literal.
   data = `${data}`;
   // "Remove all ASCII whitespace from data."
-  data = data.replace(/[ \t\n\f\r]/g, "");
+  data = data.replace(/[ \t\n\f\r]/g, '');
   // "If data's length divides by 4 leaving no remainder, then: if data ends
   // with one or two U+003D (=) code points, then remove them from data."
   if (data.length % 4 === 0) {
-    data = data.replace(/==?$/, "");
+    data = data.replace(/==?$/, '');
   }
   // "If data's length divides by 4 leaving a remainder of 1, then return
   // failure."
@@ -45131,7 +45139,7 @@ function atob(data) {
     return null;
   }
   // "Let output be an empty byte sequence."
-  let output = "";
+  let output = '';
   // "Let buffer be an empty buffer that can have bits appended to it."
   //
   // We append bits via left-shift and or.  accumulatedBits is used to track
@@ -45188,7 +45196,7 @@ function atob(data) {
  */
 
 const keystr =
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 function atobLookup(chr) {
   const index = keystr.indexOf(chr);
@@ -45199,96 +45207,98 @@ function atobLookup(chr) {
 const _events = new WeakMap();
 
 class Touch {
-    constructor(touch) {
-        // CanvasTouch{identifier, x, y}
-        // Touch{identifier, pageX, pageY, clientX, clientY, force}
-        this.identifier = touch.identifier;
+  constructor(touch) {
+    // CanvasTouch{identifier, x, y}
+    // Touch{identifier, pageX, pageY, clientX, clientY, force}
+    this.identifier = touch.identifier;
 
-        this.force = touch.force === undefined ? 1 : touch.force;
-        this.pageX = touch.pageX === undefined ? touch.x : touch.pageX;
-        this.pageY = touch.pageY  === undefined ? touch.y : touch.pageY;
-        this.clientX = touch.clientX  === undefined ? touch.x : touch.clientX;
-        this.clientY = touch.clientY  === undefined ? touch.y : touch.clientY;
+    this.force = touch.force === undefined ? 1 : touch.force;
+    this.pageX = touch.pageX === undefined ? touch.x : touch.pageX;
+    this.pageY = touch.pageY === undefined ? touch.y : touch.pageY;
+    this.clientX = touch.clientX === undefined ? touch.x : touch.clientX;
+    this.clientY = touch.clientY === undefined ? touch.y : touch.clientY;
 
-        this.screenX = this.pageX;
-        this.screenY = this.pageY;
-    }
+    this.screenX = this.pageX;
+    this.screenY = this.pageY;
+  }
 }
 
 class EventTarget {
-    constructor() {
-        _events.set(this, {});
+  constructor() {
+    _events.set(this, {});
+  }
+
+  addEventListener(type, listener, options = {}) {
+    let events = _events.get(this);
+
+    if (!events) {
+      events = {};
+      _events.set(this, events);
     }
-
-    addEventListener(type, listener, options = {}) {
-        let events = _events.get(this);
-
-        if (!events) {
-            events = {};
-            _events.set(this, events);
-        }
-        if (!events[type]) {
-            events[type] = [];
-        }
-        events[type].push(listener);
-
-        if (options.capture) ;
-        if (options.once) ;
-        if (options.passive) ;
+    if (!events[type]) {
+      events[type] = [];
     }
+    events[type].push(listener);
 
-    removeEventListener(type, listener) {
-        const events = _events.get(this);
+    if (options.capture) ;
+    if (options.once) ;
+    if (options.passive) ;
+  }
 
-        if (events) {
-            const listeners = events[type];
+  removeEventListener(type, listener) {
+    const events = _events.get(this);
 
-            if (listeners && listeners.length > 0) {
-                for (let i = listeners.length; i--; i > 0) {
-                    if (listeners[i] === listener) {
-                        listeners.splice(i, 1);
-                        break
-                    }
-                }
-            }
+    if (events) {
+      const listeners = events[type];
+
+      if (listeners && listeners.length > 0) {
+        for (let i = listeners.length; i--; i > 0) {
+          if (listeners[i] === listener) {
+            listeners.splice(i, 1);
+            break;
+          }
         }
+      }
     }
+  }
 
-    dispatchEvent(event = {}) {
-        if (typeof event.preventDefault !== 'function') {
-            event.preventDefault = () => {};
-        }
-        if (typeof event.stopPropagation !== 'function') {
-            event.stopPropagation = () => {};
-        }
-        const listeners = _events.get(this)[event.type];
-
-        if (listeners) {
-            for (let i = 0; i < listeners.length; i++) {
-                listeners[i](event);
-            }
-        }
+  dispatchEvent(event = {}) {
+    if (typeof event.preventDefault !== 'function') {
+      event.preventDefault = () => {};
     }
-
-    dispatchTouchEvent(e = {}) {
-        const target = {
-            ...this
-        };
-
-        const event = {
-            changedTouches: e.changedTouches.map(touch => new Touch(touch)),
-            touches: e.touches.map(touch => new Touch(touch)),
-            targetTouches: Array.prototype.slice.call(e.touches.map(touch => new Touch(touch))),
-            timeStamp: e.timeStamp,
-            target: target,
-            currentTarget: target,
-            type: e.type,
-            cancelBubble: false,
-            cancelable: false
-        };
-
-        this.dispatchEvent(event);
+    if (typeof event.stopPropagation !== 'function') {
+      event.stopPropagation = () => {};
     }
+    const listeners = _events.get(this)[event.type];
+
+    if (listeners) {
+      for (let i = 0; i < listeners.length; i++) {
+        listeners[i](event);
+      }
+    }
+  }
+
+  dispatchTouchEvent(e = {}) {
+    const target = {
+      ...this,
+    };
+
+    const event = {
+      changedTouches: e.changedTouches.map(touch => new Touch(touch)),
+      touches: e.touches.map(touch => new Touch(touch)),
+      targetTouches: Array.prototype.slice.call(
+        e.touches.map(touch => new Touch(touch)),
+      ),
+      timeStamp: e.timeStamp,
+      target: target,
+      currentTarget: target,
+      type: e.type,
+      cancelBubble: false,
+      cancelable: false,
+    };
+
+    this.dispatchEvent(event);
+  }
 }
 
 const _requestHeader = new WeakMap();
@@ -45298,7 +45308,7 @@ const _requestTask = new WeakMap();
 function _triggerEvent(type, event = {}) {
   event.target = event.target || this;
 
-  if (typeof this[`on${type}`] === "function") {
+  if (typeof this[`on${type}`] === 'function') {
     this[`on${type}`].call(this, event);
   }
 }
@@ -45308,7 +45318,7 @@ function _changeReadyState(readyState, event = {}) {
 
   event.readyState = readyState;
 
-  _triggerEvent.call(this, "readystatechange", event);
+  _triggerEvent.call(this, 'readystatechange', event);
 }
 
 function _isRelativePath(url) {
@@ -45334,16 +45344,16 @@ class $XMLHttpRequest$1 extends EventTarget {
     this.readyState = 0;
     this.response = null;
     this.responseText = null;
-    this.responseType = "text";
-    this.dataType = "arraybuffer";
+    this.responseType = 'text';
+    this.dataType = 'arraybuffer';
     this.responseXML = null;
     this.status = 0;
-    this.statusText = "";
+    this.statusText = '';
     this.upload = {};
     this.withCredentials = false;
 
     _requestHeader.set(this, {
-      "content-type": "application/x-www-form-urlencoded",
+      'content-type': 'application/x-www-form-urlencoded',
     });
     _responseHeader.set(this, {});
   }
@@ -45360,17 +45370,17 @@ class $XMLHttpRequest$1 extends EventTarget {
     const responseHeader = _responseHeader.get(this);
 
     return Object.keys(responseHeader)
-      .map((header) => {
+      .map(header => {
         return `${header}: ${responseHeader[header]}`;
       })
-      .join("\n");
+      .join('\n');
   }
 
   getResponseHeader(header) {
     return _responseHeader.get(this)[header];
   }
 
-  open(method, url ) {
+  open(method, url) {
     this._method = method;
     this._url = url;
     _changeReadyState.call(this, $XMLHttpRequest$1.OPENED);
@@ -45378,10 +45388,10 @@ class $XMLHttpRequest$1 extends EventTarget {
 
   overrideMimeType() {}
 
-  send(data = "") {
+  send(data = '') {
     if (this.readyState !== $XMLHttpRequest$1.OPENED) {
       throw new Error(
-        "Failed to execute 'send' on 'XMLHttpRequest': The object's state must be OPENED."
+        "Failed to execute 'send' on 'XMLHttpRequest': The object's state must be OPENED.",
       );
     } else {
       const url = this._url;
@@ -45395,13 +45405,12 @@ class $XMLHttpRequest$1 extends EventTarget {
       this.response = null;
 
       const onSuccess = ({ data, statusCode, header }) => {
-
-        if (responseType === "arraybuffer") {
+        if (responseType === 'arraybuffer') {
           data = decode(data);
         }
 
         statusCode = statusCode === undefined ? 200 : statusCode;
-        if (typeof data !== "string" && !(data instanceof ArrayBuffer)) {
+        if (typeof data !== 'string' && !(data instanceof ArrayBuffer)) {
           try {
             data = JSON.stringify(data);
           } catch (e) {}
@@ -45411,39 +45420,39 @@ class $XMLHttpRequest$1 extends EventTarget {
         if (header) {
           _responseHeader.set(this, header);
         }
-        _triggerEvent.call(this, "loadstart");
+        _triggerEvent.call(this, 'loadstart');
         _changeReadyState.call(this, $XMLHttpRequest$1.HEADERS_RECEIVED);
         _changeReadyState.call(this, $XMLHttpRequest$1.LOADING);
 
         this.response = data;
 
         if (data instanceof ArrayBuffer) {
-          Object.defineProperty(this, "responseText", {
+          Object.defineProperty(this, 'responseText', {
             enumerable: true,
             configurable: true,
             get: function () {
-              throw "InvalidStateError : responseType is " + this.responseType;
+              throw 'InvalidStateError : responseType is ' + this.responseType;
             },
           });
         } else {
           this.responseText = data;
         }
         _changeReadyState.call(this, $XMLHttpRequest$1.DONE);
-        _triggerEvent.call(this, "load");
-        _triggerEvent.call(this, "loadend");
+        _triggerEvent.call(this, 'load');
+        _triggerEvent.call(this, 'loadend');
       };
 
       const onFail = ({ errorMessage }) => {
         // TODO 规范错误
 
-        if (errorMessage.indexOf("abort") !== -1) {
-          _triggerEvent.call(this, "abort");
+        if (errorMessage.indexOf('abort') !== -1) {
+          _triggerEvent.call(this, 'abort');
         } else {
-          _triggerEvent.call(this, "error", {
+          _triggerEvent.call(this, 'error', {
             message: errorMessage,
           });
         }
-        _triggerEvent.call(this, "loadend");
+        _triggerEvent.call(this, 'loadend');
 
         if (relative) {
           // 用户即使没监听error事件, 也给出相应的警告
@@ -45464,11 +45473,11 @@ class $XMLHttpRequest$1 extends EventTarget {
         // }
         fs.access({
           path: url,
-          success: (res) => {
-            console.log("文件存在", res);
+          success: res => {
+            console.log('文件存在', res);
           },
-          fail: (err) => {
-            console.log("err:", err);
+          fail: err => {
+            console.log('err:', err);
           },
         });
         fs.readFile(options);
@@ -45482,7 +45491,7 @@ class $XMLHttpRequest$1 extends EventTarget {
           const fs = my.getFileSystemManager();
           fs.readFile({
             filePath: apFilePath,
-            encoding: responseType === "arraybuffer" ? 'base64' : undefined,
+            encoding: responseType === 'arraybuffer' ? 'base64' : undefined,
             // encoding: 'arraybuffer', // 不写encoding默认ArrayBuffer
             success: onSuccess,
           });
@@ -45511,19 +45520,19 @@ class $XMLHttpRequest$1 extends EventTarget {
   }
 
   addEventListener(type, listener) {
-    if (typeof listener !== "function") {
+    if (typeof listener !== 'function') {
       return;
     }
 
-    this["on" + type] = (event = {}) => {
+    this['on' + type] = (event = {}) => {
       event.target = event.target || this;
       listener.call(this, event);
     };
   }
 
   removeEventListener(type, listener) {
-    if (this["on" + type] === listener) {
-      this["on" + type] = null;
+    if (this['on' + type] === listener) {
+      this['on' + type] = null;
     }
   }
 }
@@ -45536,117 +45545,104 @@ $XMLHttpRequest$1.LOADING = 3;
 $XMLHttpRequest$1.DONE = 4;
 
 function copyProperties(target, source) {
-    for (let key of Object.getOwnPropertyNames(source)) {
-        if (key !== 'constructor'
-            && key !== 'prototype'
-            && key !== 'name'
-        ) {
-            let desc = Object.getOwnPropertyDescriptor(source, key);
-            Object.defineProperty(target, key, desc);
-        }
+  for (let key of Object.getOwnPropertyNames(source)) {
+    if (key !== 'constructor' && key !== 'prototype' && key !== 'name') {
+      let desc = Object.getOwnPropertyDescriptor(source, key);
+      Object.defineProperty(target, key, desc);
     }
+  }
 }
 
 function OffscreenCanvas() {
-  return my.createOffscreenCanvas()
+  return my.createOffscreenCanvas();
 }
 
 class TaobaoPlatform {
-
-  constructor( canvas ) {
-
+  constructor(canvas) {
     const systemInfo = my.getSystemInfoSync();
 
     this.canvas = canvas;
 
     this.document = {
-
-      createElementNS( _, type ) {
-
+      createElementNS(_, type) {
         if (type === 'canvas') return canvas;
-
         if (type === 'img') return canvas.createImage();
-
-      }
-
+      },
     };
 
     this.window = {
-
       innerWidth: systemInfo.windowWidth,
       innerHeight: systemInfo.windowHeight,
       devicePixelRatio: systemInfo.pixelRatio,
-      AudioContext: function() {},
+      AudioContext: function () {},
       URL: new $URL$1(),
       requestAnimationFrame: this.canvas.requestAnimationFrame,
-
+      cancelAnimationFrame: this.canvas.cancelAnimationFrame,
     };
 
     [this.canvas, this.document, this.window].forEach(i => {
-
       copyProperties(i.constructor.prototype, EventTarget.prototype);
-
     });
 
     this.patchCanvas();
 
+    this.onDeviceMotionChange = e => {
+      e.type = 'deviceorientation';
+      this.window.dispatchEvent(e);
+    };
   }
 
   patchCanvas() {
-
     Object.defineProperty(this.canvas, 'style', {
-
       get() {
-
         return {
           width: this.width + 'px',
-          height: this.height + 'px'
-        }
-
-      }
-
+          height: this.height + 'px',
+        };
+      },
     });
-  
+
     Object.defineProperty(this.canvas, 'clientHeight', {
-
-      get() { return this.height }
-
+      get() {
+        return this.height;
+      },
     });
-  
+
     Object.defineProperty(this.canvas, 'clientWidth', {
-
-      get() { return this.width }
-
+      get() {
+        return this.width;
+      },
     });
-
   }
 
   getGlobals() {
-
     return {
-
       atob: atob,
       Blob: Blob,
       window: this.window,
       document: this.document,
       HTMLCanvasElement: undefined,
       XMLHttpRequest: $XMLHttpRequest$1,
-      requestAnimationFrame: this.canvas.requestAnimationFrame,
       OffscreenCanvas: OffscreenCanvas,
       createImageBitmap: undefined,
+    };
+  }
 
-    }
+  enableDeviceOrientation() {
+    my.onDeviceMotionChange(this.onDeviceMotionChange);
+  }
 
+  disableDeviceOrientation() {
+    my.offDeviceMotionChange(this.onDeviceMotionChange);
   }
 
   dispose() {
-
+    this.disableDeviceOrientation();
+    this.onDeviceMotionChange = null;
     this.document = null;
     this.window = null;
     this.canvas = null;
-
   }
-
 }
 
 var GLTFLoader = ( function () {
@@ -49522,6 +49518,81 @@ var GLTFLoader = ( function () {
 
 } )();
 
+class Demo {
+  
+
+  constructor(deps) {
+    this.deps = deps;
+  }
+
+  
+
+
+}
+
+class DemoGLTFLoader extends Demo {
+  
+  
+  
+  
+
+  async init() {
+    const gltf = await this.deps.gltfLoader.loadAsync('https://dtmall-tel.alicdn.com/edgeComputingConfig/upload_models/1591673169101/RobotExpressive.glb'); 
+    gltf.scene.position.z = -5;
+    gltf.scene.position.y = -2;
+
+    this.gltf = gltf;
+    this.directionalLight = new DirectionalLight(0xffffff, 1);
+    this.ambientLight = new AmbientLight(0xffffff, 1);
+
+    this.deps.scene.add(gltf.scene);
+    this.deps.scene.add(this.directionalLight);
+    this.deps.scene.add(this.ambientLight);
+
+    // init animtion
+    const states = [
+      "Idle",
+      "Walking",
+      "Running",
+      "Dance",
+      "Death",
+      "Sitting",
+      "Standing",
+    ];
+    const emotes = ["Jump", "Yes", "No", "Wave", "Punch", "ThumbsUp"];
+    this.mixer = new AnimationMixer(gltf.scene);
+    const actions = {};
+    for (let i = 0; i < gltf.animations.length; i++) {
+      const clip = gltf.animations[i];
+      const action = this.mixer.clipAction(clip);
+      actions[clip.name] = action;
+      if (emotes.indexOf(clip.name) >= 0 || states.indexOf(clip.name) >= 4) {
+        action.clampWhenFinished = true;
+        action.loop = LoopOnce;
+      }
+    }
+
+    const activeAction = actions["Walking"];
+    activeAction.play();
+  }
+
+  update() {
+    this.mixer.update(this.deps.clock.getDelta());
+  }
+
+  dispose() {
+    this.mixer.stopAllAction();
+    this.mixer.uncacheRoot(this.gltf.scene);
+    this.deps.scene.remove(this.gltf.scene);
+    this.deps.scene.remove(this.directionalLight);
+    this.deps.scene.remove(this.ambientLight);
+    this.directionalLight = null;
+    this.ambientLight = null;
+    this.mixer = null;
+    this.deps = null;
+  }
+}
+
 function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } } function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }
 
 class ThreeSpritePlayer {
@@ -49610,12 +49681,102 @@ class ThreeSpritePlayer {
   }
 }
 
+const url = (new Array(3))
+  .fill('')
+  .map((v, k) => `/imgs/output-${k}.png`);
+
+const tile = {
+  url,
+  x: 0,
+  y: 0,
+  z: -15,
+  w: (10 * 358) / 358,
+  h: 10,
+  col: 2,
+  row: 2,
+  total: 10,
+  fps: 16,
+};
+
+class DemoThreeSpritePlayer extends Demo {
+  
+  
+  
+
+  async init() {
+    const tiles = await Promise.all(tile.url.map(url => this.deps.textureLoader.loadAsync(url)));
+    const spritePlayer = new ThreeSpritePlayer(
+      tiles,
+      tile.total,
+      tile.row,
+      tile.col,
+      tile.fps,
+      true,
+    );
+
+    const geometry = new PlaneGeometry(tile.w, tile.h);
+    const material = new MeshBasicMaterial({
+      map: spritePlayer.texture,
+      transparent: false,
+    });
+    const mesh = new Mesh(geometry, material);
+    const boxGeometry = new BoxGeometry();
+    const box = new Mesh(boxGeometry, material);
+
+    box.position.y = -1.2;
+    mesh.position.z = -8;
+    mesh.position.y = 4;
+
+    this.deps.scene.add(mesh);
+    this.deps.scene.add(box);
+
+    this.box = box;
+    this.mesh = mesh;
+    this.player = spritePlayer;
+  }
+
+  update() {
+    this.player.animate();
+    this.mesh.material.map = this.player.texture;
+  }
+
+  dispose() {
+    this.deps.scene.remove(this.mesh);
+    this.deps.scene.remove(this.box);
+    this.player.dispose();
+    this.box.geometry.dispose();
+    this.mesh.geometry.dispose();
+    this.mesh.material.dispose();
+    this.mesh.geometry = null;
+    this.mesh.material = null;
+    this.box = null;
+    this.mesh = null;
+    this.player = null;
+    this.deps = null;
+  }
+}
+
 function _optionalChain$1(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }// index.ts
+
+const DEMO_MAP = {
+  GLTFLoader: DemoGLTFLoader,
+  ThreeSpritePlayer: DemoThreeSpritePlayer,
+};
 
 // @ts-ignore
 Page({
   data: {
+    showMenu: true,
+    currItem: -1,
+    menuList: [
+      'GLTFLoader',
+      'Animation',
+      'Raycaster',
+      'DeviceOrientationControls',
+      'ThreeSpritePlayer'
+    ]
   },
+
   onCanvasReady() {
     // @ts-ignore
     my.createCanvas({
@@ -49624,133 +49785,57 @@ Page({
     });
   },
 
+  onMenuClick() {
+    this.setData({ showMenu: !this.data.showMenu });
+  },
+
+  async onMenuItemClick(e) {
+    if (this.switchingItem) return
+    this.switchingItem = true;
+
+    const { i, item } = e.currentTarget.dataset;
+    const demo = new (DEMO_MAP[item])(this.deps) ;
+    await demo.init();
+
+    _optionalChain$1([(this.currDemo ), 'optionalAccess', _ => _.dispose, 'call', _2 => _2()]);
+    this.currDemo = demo;
+    this.setData({ currItem: i, showMenu: false });
+    this.switchingItem = false;
+  },
+
   initCanvas(canvas) {
     PLATFORM.set(new TaobaoPlatform(canvas));
-    const renderer = new WebGL1Renderer({ canvas, antialias: true, alpha: true });
-    const camera = new PerspectiveCamera(75, $window.innerWidth / $window.innerHeight, 0.1, 100);
-    const scene = new Scene();
-    const geometry = new BoxGeometry();
-    const material = new MeshBasicMaterial();
-    const box = new Mesh(geometry, material);
-    const directionalLight = new DirectionalLight(0xffffff, 1);
-    const ambientLight = new AmbientLight(0xffffff, 1);
-    const gltfLoader = new GLTFLoader();
-    const textureLoader = new TextureLoader();
-    const clock = new Clock();
-    renderer.outputEncoding = sRGBEncoding;
-    renderer.setPixelRatio($window.devicePixelRatio);
-    renderer.setSize($window.innerWidth, $window.innerHeight);
-    scene.add(box, directionalLight, ambientLight);
-    camera.position.z = 0;
-    box.position.y = -1.2;
-    scene.position.z = -3;
 
     console.log($window.innerWidth, $window.innerHeight);
     console.log(canvas.width, canvas.height);
 
+    const renderer = new WebGL1Renderer({ canvas, antialias: true, alpha: true });
+    const camera = new PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 100);
+    const scene = new Scene();
+    const clock = new Clock();
+    const gltfLoader = new GLTFLoader();
+    const textureLoader = new TextureLoader();
 
-    let animationMixer;
-    gltfLoader.loadAsync('https://dtmall-tel.alicdn.com/edgeComputingConfig/upload_models/1591673169101/RobotExpressive.glb')
-      .then((gltf) => {
-        gltf.scene.position.z = -5;
-        scene.add(gltf.scene);
-        animationMixer = this.initAnimation(gltf);
-      });
+    this.deps = { renderer, camera, scene, clock, gltfLoader, textureLoader };
 
-    let spritePlayer;
-    let plane;
-    const initPlane = (texture, w, h) => {
-      const geometry = new PlaneGeometry(w, h);
-      const material = new MeshBasicMaterial({
-        map: texture,
-        transparent: false,
-      });
-      const mesh = new Mesh(geometry, material);
-      return mesh
-    };
-    const initSpritePlayer = async () => {
-      const url = (new Array(3))
-        .fill('')
-        .map((v, k) => `/imgs/output-${k}.png`);
-      const tile = {
-        url,
-        x: 0,
-        y: 0,
-        z: -15,
-        w: (10 * 358) / 358,
-        h: 10,
-        col: 2,
-        row: 2,
-        total: 10,
-        fps: 16,
-      };
-      const tiles = await Promise.all(tile.url.map(url => textureLoader.loadAsync(url)));
-      const spritePlayer = new ThreeSpritePlayer(
-        tiles,
-        tile.total,
-        tile.row,
-        tile.col,
-        tile.fps,
-        true,
-      );
-      plane = initPlane(spritePlayer.texture, tile.w, tile.h);
-      scene.add(plane);
-      plane.position.z = -8;
-      plane.position.y = 4;
-      return spritePlayer;
-    };
-    initSpritePlayer().then(i => { spritePlayer = i; });
+    scene.position.z = -3;
+    renderer.outputEncoding = sRGBEncoding;
+    renderer.setPixelRatio($window.devicePixelRatio);
+    renderer.setSize(canvas.width, canvas.height);
 
     const render = () => {
+      if (this.disposing) return
       $requestAnimationFrame(render);
-      box.rotation.x += 0.01;
-      box.rotation.y += 0.01;
-      if (spritePlayer && plane) {
-        spritePlayer.animate();
-        const needsUpdate = !box.material.map;
-        box.material.map = spritePlayer.texture;
-        box.material.needsUpdate = needsUpdate;
-        // @ts-ignore
-        plane.material.map = spritePlayer.texture;
-      }
-      _optionalChain$1([animationMixer, 'optionalAccess', _ => _.update, 'call', _2 => _2(clock.getDelta())]);
+      _optionalChain$1([(this.currDemo ), 'optionalAccess', _3 => _3.update, 'call', _4 => _4()]);
       renderer.render(scene, camera);
     };
 
     render();
   },
 
-  initAnimation(gltf) {
-    var states = [
-      "Idle",
-      "Walking",
-      "Running",
-      "Dance",
-      "Death",
-      "Sitting",
-      "Standing",
-    ];
-    const emotes = ["Jump", "Yes", "No", "Wave", "Punch", "ThumbsUp"];
-    const mixer = new AnimationMixer(gltf.scene);
-    const actions = {};
-    for (var i = 0; i < gltf.animations.length; i++) {
-      var clip = gltf.animations[i];
-      var action = mixer.clipAction(clip);
-      actions[clip.name] = action;
-      if (emotes.indexOf(clip.name) >= 0 || states.indexOf(clip.name) >= 4) {
-        action.clampWhenFinished = true;
-        action.loop = LoopOnce;
-      }
-    }
-
-    // expressions
-    // const face = gltf.scene.getObjectByName("Head_2");
-    const activeAction = actions["Walking"];
-    activeAction.play();
-    return mixer
-  },
-
   onUnload() {
+    this.disposing = true;
+    _optionalChain$1([(this.currDemo ), 'optionalAccess', _5 => _5.dispose, 'call', _6 => _6()]);
     PLATFORM.dispose();
   }
 });
