@@ -9,6 +9,7 @@
     "rollup": "^2.36.2",
     "rollup-plugin-terser": "^7.0.2",
     "three-platformize": "file:..\\three-platformize",
+    "three-platformize-demo": "file:..\\three-platformize-demo",
     "three-sprite-player": "^1.0.4"
   }
 }

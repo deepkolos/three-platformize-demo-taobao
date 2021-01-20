@@ -2,13 +2,12 @@
 import { $requestAnimationFrame as requestAnimationFrame, $window as window, Clock, PerspectiveCamera, PLATFORM, Scene, sRGBEncoding, TextureLoader, WebGL1Renderer } from 'three-platformize'
 import { TaobaoPlatform } from 'three-platformize/src/TaobaoPlatform'
 import { GLTFLoader } from 'three-platformize/examples/jsm/loaders/GLTFLoader'
-import { Demo } from '../../demos/Demo'
-import { DemoGLTFLoader } from '../../demos/GLTFLoader'
-import { DemoThreeSpritePlayer } from '../../demos/ThreeSpritePlayer'
+import { Demo, DemoGLTFLoader, DemoThreeSpritePlayer, DemoDeviceOrientationControls } from 'three-platformize-demo/src/index'
 
 const DEMO_MAP = {
   GLTFLoader: DemoGLTFLoader,
   ThreeSpritePlayer: DemoThreeSpritePlayer,
+  DeviceOrientationControls: DemoDeviceOrientationControls
 }
 
 // @ts-ignore
@@ -18,9 +17,10 @@ Page({
     currItem: -1,
     menuList: [
       'GLTFLoader',
-      'Raycaster',
+      'ThreeSpritePlayer',
       'DeviceOrientationControls',
-      'ThreeSpritePlayer'
+      'Raycaster',
+      'Geometry'
     ]
   },
 
@@ -41,6 +41,7 @@ Page({
     this.switchingItem = true
 
     const { i, item } = e.currentTarget.dataset;
+
     const demo = new (DEMO_MAP[item])(this.deps) as Demo;
     await demo.init();
 
@@ -57,7 +58,7 @@ Page({
     console.log(canvas.width, canvas.height)
 
     const renderer = new WebGL1Renderer({ canvas, antialias: true, alpha: true });
-    const camera = new PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 100);
+    const camera = new PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 1000);
     const scene = new Scene();
     const clock = new Clock();
     const gltfLoader = new GLTFLoader();

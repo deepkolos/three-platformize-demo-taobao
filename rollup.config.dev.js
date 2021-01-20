@@ -11,7 +11,7 @@ export default [
       file: './pages/index/index.js'
     },
     plugins: [
-      resolve(),
+      resolve({ extensions: ['.ts', '.js'] }),
       sucrase({
         transforms: ['typescript']
       })
