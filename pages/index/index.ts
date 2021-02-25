@@ -2,11 +2,27 @@
 import { $requestAnimationFrame as requestAnimationFrame, $window as window, Clock, PerspectiveCamera, PLATFORM, Scene, sRGBEncoding, TextureLoader, WebGL1Renderer } from 'three-platformize'
 import { TaobaoPlatform } from 'three-platformize/src/TaobaoPlatform'
 import { GLTFLoader } from 'three-platformize/examples/jsm/loaders/GLTFLoader'
-import { Demo, DemoGLTFLoader, DemoThreeSpritePlayer, DemoDeviceOrientationControls } from 'three-platformize-demo/src/index'
+import { DemoDeps, Demo, DemoGLTFLoader, DemoThreeSpritePlayer, DemoDeviceOrientationControls, DemoRGBELoader, DemoSVGLoader, DemoOBJLoader, DemoMeshOpt, DemoEXRLoader, DemoHDRPrefilterTexture, DemoMTLLoader, DemoLWOLoader, DemoFBXLoader, DemoBVHLoader, DemoColladaLoader, DemoMeshQuantization, DemoTTFLoader, DemoSTLLoader, DemoPDBLoader } from 'three-platformize-demo/src/index'
 
 const DEMO_MAP = {
+  // BasisLoader: DemoBasisLoader,
+  MeshOpt: DemoMeshOpt,
+  PDBLoader: DemoPDBLoader,
+  STLLoader: DemoSTLLoader,
+  TTFLoader: DemoTTFLoader,
+  BVHLoader: DemoBVHLoader,
+  FBXLoader: DemoFBXLoader,
+  LWOLoader: DemoLWOLoader,
+  MTLLoader: DemoMTLLoader,
+  EXRLoader: DemoEXRLoader,
+  OBJLoader: DemoOBJLoader,
+  SVGLoader: DemoSVGLoader,
+  RGBELoader: DemoRGBELoader,
   GLTFLoader: DemoGLTFLoader,
+  ColladaLoader: DemoColladaLoader,
+  MeshQuantization: DemoMeshQuantization,
   ThreeSpritePlayer: DemoThreeSpritePlayer,
+  HDRPrefilterTexture: DemoHDRPrefilterTexture,
   DeviceOrientationControls: DemoDeviceOrientationControls
 }
 
@@ -19,8 +35,21 @@ Page({
       'GLTFLoader',
       'ThreeSpritePlayer',
       'DeviceOrientationControls',
-      'Raycaster',
-      'Geometry'
+      'RGBELoader',
+      'SVGLoader',
+      'OBJLoader',
+      'MeshOpt',
+      'EXRLoader',
+      'HDRPrefilterTexture',
+      'MTLLoader',
+      'LWOLoader',
+      'FBXLoader',
+      'BVHLoader',
+      'ColladaLoader',
+      'MeshQuantization',
+      'TTFLoader',
+      'STLLoader',
+      'PDBLoader',
     ]
   },
 

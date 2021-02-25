@@ -49,6 +49,7 @@
   flex-direction: column;
   transform: translateX(100%);
   transition: transform ease 0.33s;
+  overflow: auto;
 }
 
 .menu-can.active {
