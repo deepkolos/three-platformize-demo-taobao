@@ -3,12 +3,12 @@ import resolve from '@rollup/plugin-node-resolve';
 
 export default [
   {
-    input: './pages/index/index.ts',
+    input: './miniprogram/pages/index/index.ts',
     treeshake: true,
     cache: false,
     output: {
       format: 'esm',
-      file: './pages/index/index.js'
+      file: './miniprogram/pages/index/index.js'
     },
     plugins: [
       resolve({ extensions: ['.ts', '.js'] }),

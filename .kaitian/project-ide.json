@@ -1,6 +1,7 @@
 {
   "enableDistFileMinify": true,
-  "enableDataPreload": false,
-  "enableLegacyRemoteDebug": true,
-  "ignoreHttpDomainCheck": false
+  "enableDataPreload": true,
+  "enableLegacyRemoteDebug": false,
+  "ignoreHttpDomainCheck": true,
+  "ignoreWebViewDomainCheck": true
 }

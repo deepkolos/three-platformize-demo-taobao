@@ -1,3 +1,5 @@
 {
-  "enableParallelLoader": true
+  "enableParallelLoader": true,
+  "enableEnhancedBuild": true,
+  "miniprogramRoot": "miniprogram"
 }

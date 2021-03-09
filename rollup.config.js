@@ -4,11 +4,11 @@ import { terser } from "rollup-plugin-terser";
 
 export default [
   {
-    input: './pages/index/index.ts',
+    input: './miniprogram/pages/index/index.ts',
     treeshake: true,
     output: {
       format: 'esm',
-      file: './pages/index/index.js'
+      file: './miniprogram/pages/index/index.js'
     },
     plugins: [
       resolve(),

@@ -10,7 +10,7 @@ let $XMLHttpRequest = undefined;
 let $OffscreenCanvas = undefined;
 let $HTMLCanvasElement = undefined;
 let $createImageBitmap = undefined;
-let $requestAnimationFrame = undefined;
+let $defaultWebGLExtensions = {};
 
 class Platform {
   set(platform) {
@@ -32,8 +32,10 @@ class Platform {
     $URL = $window.URL;
     $DOMParser = $window.DOMParser;
     $TextDecoder = $window.TextDecoder;
-    $requestAnimationFrame = $window.requestAnimationFrame;
+    $window.requestAnimationFrame;
     $window.cancelAnimationFrame;
+
+    if (platform.setWebGLExtensions) $defaultWebGLExtensions = platform.setWebGLExtensions();
   }
 
   dispose() {
@@ -50,7 +52,7 @@ class Platform {
     $OffscreenCanvas = null;
     $HTMLCanvasElement = null;
     $createImageBitmap = null;
-    $requestAnimationFrame = null;
+    $defaultWebGLExtensions = null;
   }
 }
 
@@ -14705,7 +14707,7 @@ function WebGLCubeMaps( renderer ) {
 
 function WebGLExtensions( gl ) {
 
-	const extensions = {};
+	const extensions = $defaultWebGLExtensions || {};
 
 	function getExtension( name ) {
 
@@ -44884,6 +44886,23 @@ function atobLookup(chr) {
 
 const _events = new WeakMap();
 
+class Touch {
+  constructor(touch) {
+    // CanvasTouch{identifier, x, y}
+    // Touch{identifier, pageX, pageY, clientX, clientY, force}
+    this.identifier = touch.identifier;
+
+    this.force = touch.force === undefined ? 1 : touch.force;
+    this.pageX = touch.pageX === undefined ? touch.x : touch.pageX;
+    this.pageY = touch.pageY === undefined ? touch.y : touch.pageY;
+    this.clientX = touch.clientX === undefined ? touch.x : touch.clientX;
+    this.clientY = touch.clientY === undefined ? touch.y : touch.clientY;
+
+    this.screenX = this.pageX;
+    this.screenY = this.pageY;
+  }
+}
+
 class EventTarget {
   constructor() {
     _events.set(this, {});
@@ -45422,9 +45441,36 @@ class $DOMParser$1 {
   }
 }
 
+class $TextDecoder$1 {
+  /**
+   * 不支持 UTF-8 code points 大于 1 字节
+   * @see https://stackoverflow.com/questions/17191945/conversion-between-utf-8-arraybuffer-and-string
+   * @param {Uint8Array} uint8Array
+   */
+  decode(uint8Array) {
+    // from LoaderUtils.js
+    let s = '';
+
+    // Implicitly assumes little-endian.
+    for (let i = 0, il = uint8Array.length; i < il; i++)
+      s += String.fromCharCode(uint8Array[i]);
+
+    try {
+      // merges multi-byte utf-8 characters.
+      return decodeURIComponent(escape(s));
+    } catch (e) {
+      // see #16358
+      return s;
+    }
+    // return String.fromCharCode.apply(null, uint8Array);
+  }
+}
+
 function OffscreenCanvas() {
   return my.createOffscreenCanvas();
 }
+
+const radianToDegree = 180 / Math.PI;
 
 class TaobaoPlatform {
   constructor(canvas, width, height) {
@@ -45437,7 +45483,12 @@ class TaobaoPlatform {
     this.document = {
       createElementNS(_, type) {
         if (type === 'canvas') return canvas;
-        if (type === 'img') return canvas.createImage();
+        if (type === 'img') {
+          const img = canvas.createImage();
+          img.addEventListener = (name, cb) => (img[`on${name}`] = cb.bind(img));
+          img.removeEventListener = (name, cb) => (img[`on${name}`] = null);
+          return img;
+        }
       },
     };
 
@@ -45447,11 +45498,11 @@ class TaobaoPlatform {
       devicePixelRatio: systemInfo.pixelRatio,
 
       DOMParser: $DOMParser$1,
-      TextDecoder,
+      TextDecoder: $TextDecoder$1,
       URL: new $URL$1(),
       AudioContext: function () {},
-      requestAnimationFrame: this.canvas.requestAnimationFrame,
-      cancelAnimationFrame: this.canvas.cancelAnimationFrame,
+      requestAnimationFrame: cb => this.canvas.requestAnimationFrame(cb),
+      cancelAnimationFrame: cb => this.canvas.cancelAnimationFrame(cb),
 
       DeviceOrientationEvent: {
         requestPermission() {
@@ -45460,18 +45511,19 @@ class TaobaoPlatform {
       },
     };
 
-    [this.document, this.window].forEach(i => {
+    [this.document, this.window, this.canvas].forEach(i => {
       copyProperties(i.constructor.prototype, EventTarget.prototype);
     });
 
     this.patchCanvas();
 
     this.onDeviceMotionChange = e => {
-      e.type = 'deviceorientation';
-      e.alpha *= -1;
-      e.beta *= -1;
-      e.gamma *= -1;
-      this.window.dispatchEvent(e);
+      this.window.dispatchEvent({
+        type: 'deviceorientation',
+        alpha: e.alpha * radianToDegree,
+        beta: -e.beta * radianToDegree,
+        gamma: e.gamma * radianToDegree,
+      });
     };
 
     // this.canvas.ownerDocument = this.document;
@@ -45500,6 +45552,12 @@ class TaobaoPlatform {
     });
   }
 
+  setWebGLExtensions() {
+    return {
+      EXT_blend_minmax: null,
+    };
+  }
+
   getGlobals() {
     return {
       atob: atob,
@@ -45519,6 +45577,24 @@ class TaobaoPlatform {
 
   disableDeviceOrientation() {
     my.offDeviceMotionChange(this.onDeviceMotionChange);
+  }
+
+  dispatchTouchEvent(e = {}) {
+    const target = { ...this };
+
+    const event = {
+      changedTouches: e.changedTouches.map(touch => new Touch(touch)),
+      touches: e.touches.map(touch => new Touch(touch)),
+      targetTouches: Array.prototype.slice.call(e.touches.map(touch => new Touch(touch))),
+      timeStamp: e.timeStamp,
+      target: target,
+      currentTarget: target,
+      type: e.type.toLowerCase(),
+      cancelBubble: false,
+      cancelable: false,
+    };
+
+    this.canvas.dispatchEvent(event);
   }
 
   dispose() {
@@ -50622,6 +50698,7 @@ MapControls.prototype.constructor = MapControls;
 function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }
 
 const baseUrl = 'http://www.yanhuangxueyuan.com/threejs/examples';
+// export const baseUrl = 'https://threejs.org/examples';
 
 
 
@@ -52463,6 +52540,535 @@ class DemoMeshQuantization extends Demo {
     this.reset();
   }
 }
+
+var TGALoader = function ( manager ) {
+
+	DataTextureLoader.call( this, manager );
+
+};
+
+TGALoader.prototype = Object.assign( Object.create( DataTextureLoader.prototype ), {
+
+	constructor: TGALoader,
+
+	load: function ( url, onLoad, onProgress, onError ) {
+
+		function onDataTextureLoad( texture, texData ) {
+
+			texture.flipY = true;
+			texture.generateMipmaps = true;
+			texture.unpackAlignment = 4;
+			texture.magFilter = LinearFilter;
+			texture.minFilter = LinearMipmapLinearFilter;
+
+			if ( onLoad ) onLoad( texture, texData );
+
+		}
+
+		return DataTextureLoader.prototype.load.call( this, url, onDataTextureLoad, onProgress, onError );
+
+	},
+
+	parse: function ( buffer ) {
+
+		// reference from vthibault, https://github.com/vthibault/roBrowser/blob/master/src/Loaders/Targa.js
+
+		function tgaCheckHeader( header ) {
+
+			switch ( header.image_type ) {
+
+				// check indexed type
+
+				case TGA_TYPE_INDEXED:
+				case TGA_TYPE_RLE_INDEXED:
+					if ( header.colormap_length > 256 || header.colormap_size !== 24 || header.colormap_type !== 1 ) {
+
+						console.error( 'THREE.TGALoader: Invalid type colormap data for indexed type.' );
+
+					}
+
+					break;
+
+					// check colormap type
+
+				case TGA_TYPE_RGB:
+				case TGA_TYPE_GREY:
+				case TGA_TYPE_RLE_RGB:
+				case TGA_TYPE_RLE_GREY:
+					if ( header.colormap_type ) {
+
+						console.error( 'THREE.TGALoader: Invalid type colormap data for colormap type.' );
+
+					}
+
+					break;
+
+					// What the need of a file without data ?
+
+				case TGA_TYPE_NO_DATA:
+					console.error( 'THREE.TGALoader: No data.' );
+
+					// Invalid type ?
+
+				default:
+					console.error( 'THREE.TGALoader: Invalid type "%s".', header.image_type );
+
+			}
+
+			// check image width and height
+
+			if ( header.width <= 0 || header.height <= 0 ) {
+
+				console.error( 'THREE.TGALoader: Invalid image size.' );
+
+			}
+
+			// check image pixel size
+
+			if ( header.pixel_size !== 8 && header.pixel_size !== 16 &&
+				header.pixel_size !== 24 && header.pixel_size !== 32 ) {
+
+				console.error( 'THREE.TGALoader: Invalid pixel size "%s".', header.pixel_size );
+
+			}
+
+		}
+
+		// parse tga image buffer
+
+		function tgaParse( use_rle, use_pal, header, offset, data ) {
+
+			var pixel_data,
+				pixel_size,
+				pixel_total,
+				palettes;
+
+			pixel_size = header.pixel_size >> 3;
+			pixel_total = header.width * header.height * pixel_size;
+
+			 // read palettes
+
+			 if ( use_pal ) {
+
+				 palettes = data.subarray( offset, offset += header.colormap_length * ( header.colormap_size >> 3 ) );
+
+			 }
+
+			 // read RLE
+
+			 if ( use_rle ) {
+
+				 pixel_data = new Uint8Array( pixel_total );
+
+				var c, count, i;
+				var shift = 0;
+				var pixels = new Uint8Array( pixel_size );
+
+				while ( shift < pixel_total ) {
+
+					c = data[ offset ++ ];
+					count = ( c & 0x7f ) + 1;
+
+					// RLE pixels
+
+					if ( c & 0x80 ) {
+
+						// bind pixel tmp array
+
+						for ( i = 0; i < pixel_size; ++ i ) {
+
+							pixels[ i ] = data[ offset ++ ];
+
+						}
+
+						// copy pixel array
+
+						for ( i = 0; i < count; ++ i ) {
+
+							pixel_data.set( pixels, shift + i * pixel_size );
+
+						}
+
+						shift += pixel_size * count;
+
+					} else {
+
+						// raw pixels
+
+						count *= pixel_size;
+
+						for ( i = 0; i < count; ++ i ) {
+
+							pixel_data[ shift + i ] = data[ offset ++ ];
+
+						}
+
+						shift += count;
+
+					}
+
+				}
+
+			 } else {
+
+				// raw pixels
+
+				pixel_data = data.subarray(
+					 offset, offset += ( use_pal ? header.width * header.height : pixel_total )
+				);
+
+			 }
+
+			 return {
+				pixel_data: pixel_data,
+				palettes: palettes
+			 };
+
+		}
+
+		function tgaGetImageData8bits( imageData, y_start, y_step, y_end, x_start, x_step, x_end, image, palettes ) {
+
+			var colormap = palettes;
+			var color, i = 0, x, y;
+			var width = header.width;
+
+			for ( y = y_start; y !== y_end; y += y_step ) {
+
+				for ( x = x_start; x !== x_end; x += x_step, i ++ ) {
+
+					color = image[ i ];
+					imageData[ ( x + width * y ) * 4 + 3 ] = 255;
+					imageData[ ( x + width * y ) * 4 + 2 ] = colormap[ ( color * 3 ) + 0 ];
+					imageData[ ( x + width * y ) * 4 + 1 ] = colormap[ ( color * 3 ) + 1 ];
+					imageData[ ( x + width * y ) * 4 + 0 ] = colormap[ ( color * 3 ) + 2 ];
+
+				}
+
+			}
+
+			return imageData;
+
+		}
+
+		function tgaGetImageData16bits( imageData, y_start, y_step, y_end, x_start, x_step, x_end, image ) {
+
+			var color, i = 0, x, y;
+			var width = header.width;
+
+			for ( y = y_start; y !== y_end; y += y_step ) {
+
+				for ( x = x_start; x !== x_end; x += x_step, i += 2 ) {
+
+					color = image[ i + 0 ] + ( image[ i + 1 ] << 8 ); // Inversed ?
+					imageData[ ( x + width * y ) * 4 + 0 ] = ( color & 0x7C00 ) >> 7;
+					imageData[ ( x + width * y ) * 4 + 1 ] = ( color & 0x03E0 ) >> 2;
+					imageData[ ( x + width * y ) * 4 + 2 ] = ( color & 0x001F ) >> 3;
+					imageData[ ( x + width * y ) * 4 + 3 ] = ( color & 0x8000 ) ? 0 : 255;
+
+				}
+
+			}
+
+			return imageData;
+
+		}
+
+		function tgaGetImageData24bits( imageData, y_start, y_step, y_end, x_start, x_step, x_end, image ) {
+
+			var i = 0, x, y;
+			var width = header.width;
+
+			for ( y = y_start; y !== y_end; y += y_step ) {
+
+				for ( x = x_start; x !== x_end; x += x_step, i += 3 ) {
+
+					imageData[ ( x + width * y ) * 4 + 3 ] = 255;
+					imageData[ ( x + width * y ) * 4 + 2 ] = image[ i + 0 ];
+					imageData[ ( x + width * y ) * 4 + 1 ] = image[ i + 1 ];
+					imageData[ ( x + width * y ) * 4 + 0 ] = image[ i + 2 ];
+
+				}
+
+			}
+
+			return imageData;
+
+		}
+
+		function tgaGetImageData32bits( imageData, y_start, y_step, y_end, x_start, x_step, x_end, image ) {
+
+			var i = 0, x, y;
+			var width = header.width;
+
+			for ( y = y_start; y !== y_end; y += y_step ) {
+
+				for ( x = x_start; x !== x_end; x += x_step, i += 4 ) {
+
+					imageData[ ( x + width * y ) * 4 + 2 ] = image[ i + 0 ];
+					imageData[ ( x + width * y ) * 4 + 1 ] = image[ i + 1 ];
+					imageData[ ( x + width * y ) * 4 + 0 ] = image[ i + 2 ];
+					imageData[ ( x + width * y ) * 4 + 3 ] = image[ i + 3 ];
+
+				}
+
+			}
+
+			return imageData;
+
+		}
+
+		function tgaGetImageDataGrey8bits( imageData, y_start, y_step, y_end, x_start, x_step, x_end, image ) {
+
+			var color, i = 0, x, y;
+			var width = header.width;
+
+			for ( y = y_start; y !== y_end; y += y_step ) {
+
+				for ( x = x_start; x !== x_end; x += x_step, i ++ ) {
+
+					color = image[ i ];
+					imageData[ ( x + width * y ) * 4 + 0 ] = color;
+					imageData[ ( x + width * y ) * 4 + 1 ] = color;
+					imageData[ ( x + width * y ) * 4 + 2 ] = color;
+					imageData[ ( x + width * y ) * 4 + 3 ] = 255;
+
+				}
+
+			}
+
+			return imageData;
+
+		}
+
+		function tgaGetImageDataGrey16bits( imageData, y_start, y_step, y_end, x_start, x_step, x_end, image ) {
+
+			var i = 0, x, y;
+			var width = header.width;
+
+			for ( y = y_start; y !== y_end; y += y_step ) {
+
+				for ( x = x_start; x !== x_end; x += x_step, i += 2 ) {
+
+					imageData[ ( x + width * y ) * 4 + 0 ] = image[ i + 0 ];
+					imageData[ ( x + width * y ) * 4 + 1 ] = image[ i + 0 ];
+					imageData[ ( x + width * y ) * 4 + 2 ] = image[ i + 0 ];
+					imageData[ ( x + width * y ) * 4 + 3 ] = image[ i + 1 ];
+
+				}
+
+			}
+
+			return imageData;
+
+		}
+
+		function getTgaRGBA( data, width, height, image, palette ) {
+
+			var x_start,
+				y_start,
+				x_step,
+				y_step,
+				x_end,
+				y_end;
+
+			switch ( ( header.flags & TGA_ORIGIN_MASK ) >> TGA_ORIGIN_SHIFT ) {
+
+				default:
+				case TGA_ORIGIN_UL:
+					x_start = 0;
+					x_step = 1;
+					x_end = width;
+					y_start = 0;
+					y_step = 1;
+					y_end = height;
+					break;
+
+				case TGA_ORIGIN_BL:
+					x_start = 0;
+					x_step = 1;
+					x_end = width;
+					y_start = height - 1;
+					y_step = - 1;
+					y_end = - 1;
+					break;
+
+				case TGA_ORIGIN_UR:
+					x_start = width - 1;
+					x_step = - 1;
+					x_end = - 1;
+					y_start = 0;
+					y_step = 1;
+					y_end = height;
+					break;
+
+				case TGA_ORIGIN_BR:
+					x_start = width - 1;
+					x_step = - 1;
+					x_end = - 1;
+					y_start = height - 1;
+					y_step = - 1;
+					y_end = - 1;
+					break;
+
+			}
+
+			if ( use_grey ) {
+
+				switch ( header.pixel_size ) {
+
+					case 8:
+						tgaGetImageDataGrey8bits( data, y_start, y_step, y_end, x_start, x_step, x_end, image );
+						break;
+
+					case 16:
+						tgaGetImageDataGrey16bits( data, y_start, y_step, y_end, x_start, x_step, x_end, image );
+						break;
+
+					default:
+						console.error( 'THREE.TGALoader: Format not supported.' );
+						break;
+
+				}
+
+			} else {
+
+				switch ( header.pixel_size ) {
+
+					case 8:
+						tgaGetImageData8bits( data, y_start, y_step, y_end, x_start, x_step, x_end, image, palette );
+						break;
+
+					case 16:
+						tgaGetImageData16bits( data, y_start, y_step, y_end, x_start, x_step, x_end, image );
+						break;
+
+					case 24:
+						tgaGetImageData24bits( data, y_start, y_step, y_end, x_start, x_step, x_end, image );
+						break;
+
+					case 32:
+						tgaGetImageData32bits( data, y_start, y_step, y_end, x_start, x_step, x_end, image );
+						break;
+
+					default:
+						console.error( 'THREE.TGALoader: Format not supported.' );
+						break;
+
+				}
+
+			}
+
+			// Load image data according to specific method
+			// var func = 'tgaGetImageData' + (use_grey ? 'Grey' : '') + (header.pixel_size) + 'bits';
+			// func(data, y_start, y_step, y_end, x_start, x_step, x_end, width, image, palette );
+			return data;
+
+		}
+
+		// TGA constants
+
+		var TGA_TYPE_NO_DATA = 0,
+			TGA_TYPE_INDEXED = 1,
+			TGA_TYPE_RGB = 2,
+			TGA_TYPE_GREY = 3,
+			TGA_TYPE_RLE_INDEXED = 9,
+			TGA_TYPE_RLE_RGB = 10,
+			TGA_TYPE_RLE_GREY = 11,
+
+			TGA_ORIGIN_MASK = 0x30,
+			TGA_ORIGIN_SHIFT = 0x04,
+			TGA_ORIGIN_BL = 0x00,
+			TGA_ORIGIN_BR = 0x01,
+			TGA_ORIGIN_UL = 0x02,
+			TGA_ORIGIN_UR = 0x03;
+
+		if ( buffer.length < 19 ) console.error( 'THREE.TGALoader: Not enough data to contain header.' );
+
+		var content = new Uint8Array( buffer ),
+			offset = 0,
+			header = {
+				id_length: content[ offset ++ ],
+				colormap_type: content[ offset ++ ],
+				image_type: content[ offset ++ ],
+				colormap_index: content[ offset ++ ] | content[ offset ++ ] << 8,
+				colormap_length: content[ offset ++ ] | content[ offset ++ ] << 8,
+				colormap_size: content[ offset ++ ],
+				origin: [
+					content[ offset ++ ] | content[ offset ++ ] << 8,
+					content[ offset ++ ] | content[ offset ++ ] << 8
+				],
+				width: content[ offset ++ ] | content[ offset ++ ] << 8,
+				height: content[ offset ++ ] | content[ offset ++ ] << 8,
+				pixel_size: content[ offset ++ ],
+				flags: content[ offset ++ ]
+			};
+
+		// check tga if it is valid format
+
+		tgaCheckHeader( header );
+
+		if ( header.id_length + offset > buffer.length ) {
+
+			console.error( 'THREE.TGALoader: No data.' );
+
+		}
+
+		// skip the needn't data
+
+		offset += header.id_length;
+
+		// get targa information about RLE compression and palette
+
+		var use_rle = false,
+			use_pal = false,
+			use_grey = false;
+
+		switch ( header.image_type ) {
+
+			case TGA_TYPE_RLE_INDEXED:
+				use_rle = true;
+				use_pal = true;
+				break;
+
+			case TGA_TYPE_INDEXED:
+				use_pal = true;
+				break;
+
+			case TGA_TYPE_RLE_RGB:
+				use_rle = true;
+				break;
+
+			case TGA_TYPE_RGB:
+				break;
+
+			case TGA_TYPE_RLE_GREY:
+				use_rle = true;
+				use_grey = true;
+				break;
+
+			case TGA_TYPE_GREY:
+				use_grey = true;
+				break;
+
+		}
+
+		//
+
+		var imageData = new Uint8Array( header.width * header.height * 4 );
+		var result = tgaParse( use_rle, use_pal, header, offset, content );
+		getTgaRGBA( imageData, header.width, header.height, result.pixel_data, result.palettes );
+
+		return {
+
+			data: imageData,
+			width: header.width,
+			height: header.height,
+
+		};
+
+	}
+
+} );
 
 var PDBLoader = function ( manager ) {
 
@@ -83398,7 +84004,8 @@ class DemoGLTFLoader extends Demo {
 
   async init() {
     const gltf = (await this.deps.gltfLoader.loadAsync(
-      baseUrl + '/models/gltf/RobotExpressive/RobotExpressive.glb',
+      // baseUrl + '/models/gltf/RobotExpressive/RobotExpressive.glb',
+      'https://dtmall-tel.alicdn.com/edgeComputingConfig/upload_models/1591673169101/RobotExpressive.glb',
     )) ;
     gltf.scene.position.z = 2.5;
     gltf.scene.position.y = -2;
@@ -83409,15 +84016,7 @@ class DemoGLTFLoader extends Demo {
     this.deps.camera.position.z = 10;
 
     // init animtion
-    const states = [
-      'Idle',
-      'Walking',
-      'Running',
-      'Dance',
-      'Death',
-      'Sitting',
-      'Standing',
-    ];
+    const states = ['Idle', 'Walking', 'Running', 'Dance', 'Death', 'Sitting', 'Standing'];
     const emotes = ['Jump', 'Yes', 'No', 'Wave', 'Punch', 'ThumbsUp'];
     this.mixer = new AnimationMixer(gltf.scene);
     const actions = {};
@@ -83448,549 +84047,6 @@ class DemoGLTFLoader extends Demo {
     this.reset();
   }
 }
-
-var TGALoader = function ( manager ) {
-
-	Loader.call( this, manager );
-
-};
-
-TGALoader.prototype = Object.assign( Object.create( Loader.prototype ), {
-
-	constructor: TGALoader,
-
-	load: function ( url, onLoad, onProgress, onError ) {
-
-		var scope = this;
-
-		var texture = new Texture();
-
-		var loader = new FileLoader( this.manager );
-		loader.setResponseType( 'arraybuffer' );
-		loader.setPath( this.path );
-		loader.setWithCredentials( this.withCredentials );
-
-		loader.load( url, function ( buffer ) {
-
-			texture.image = scope.parse( buffer );
-			texture.needsUpdate = true;
-
-			if ( onLoad !== undefined ) {
-
-				onLoad( texture );
-
-			}
-
-		}, onProgress, onError );
-
-		return texture;
-
-	},
-
-	parse: function ( buffer ) {
-
-		// reference from vthibault, https://github.com/vthibault/roBrowser/blob/master/src/Loaders/Targa.js
-
-		function tgaCheckHeader( header ) {
-
-			switch ( header.image_type ) {
-
-				// check indexed type
-
-				case TGA_TYPE_INDEXED:
-				case TGA_TYPE_RLE_INDEXED:
-					if ( header.colormap_length > 256 || header.colormap_size !== 24 || header.colormap_type !== 1 ) {
-
-						console.error( 'THREE.TGALoader: Invalid type colormap data for indexed type.' );
-
-					}
-
-					break;
-
-					// check colormap type
-
-				case TGA_TYPE_RGB:
-				case TGA_TYPE_GREY:
-				case TGA_TYPE_RLE_RGB:
-				case TGA_TYPE_RLE_GREY:
-					if ( header.colormap_type ) {
-
-						console.error( 'THREE.TGALoader: Invalid type colormap data for colormap type.' );
-
-					}
-
-					break;
-
-					// What the need of a file without data ?
-
-				case TGA_TYPE_NO_DATA:
-					console.error( 'THREE.TGALoader: No data.' );
-
-					// Invalid type ?
-
-				default:
-					console.error( 'THREE.TGALoader: Invalid type "%s".', header.image_type );
-
-			}
-
-			// check image width and height
-
-			if ( header.width <= 0 || header.height <= 0 ) {
-
-				console.error( 'THREE.TGALoader: Invalid image size.' );
-
-			}
-
-			// check image pixel size
-
-			if ( header.pixel_size !== 8 && header.pixel_size !== 16 &&
-				header.pixel_size !== 24 && header.pixel_size !== 32 ) {
-
-				console.error( 'THREE.TGALoader: Invalid pixel size "%s".', header.pixel_size );
-
-			}
-
-		}
-
-		// parse tga image buffer
-
-		function tgaParse( use_rle, use_pal, header, offset, data ) {
-
-			var pixel_data,
-				pixel_size,
-				pixel_total,
-				palettes;
-
-			pixel_size = header.pixel_size >> 3;
-			pixel_total = header.width * header.height * pixel_size;
-
-			 // read palettes
-
-			 if ( use_pal ) {
-
-				 palettes = data.subarray( offset, offset += header.colormap_length * ( header.colormap_size >> 3 ) );
-
-			 }
-
-			 // read RLE
-
-			 if ( use_rle ) {
-
-				 pixel_data = new Uint8Array( pixel_total );
-
-				var c, count, i;
-				var shift = 0;
-				var pixels = new Uint8Array( pixel_size );
-
-				while ( shift < pixel_total ) {
-
-					c = data[ offset ++ ];
-					count = ( c & 0x7f ) + 1;
-
-					// RLE pixels
-
-					if ( c & 0x80 ) {
-
-						// bind pixel tmp array
-
-						for ( i = 0; i < pixel_size; ++ i ) {
-
-							pixels[ i ] = data[ offset ++ ];
-
-						}
-
-						// copy pixel array
-
-						for ( i = 0; i < count; ++ i ) {
-
-							pixel_data.set( pixels, shift + i * pixel_size );
-
-						}
-
-						shift += pixel_size * count;
-
-					} else {
-
-						// raw pixels
-
-						count *= pixel_size;
-
-						for ( i = 0; i < count; ++ i ) {
-
-							pixel_data[ shift + i ] = data[ offset ++ ];
-
-						}
-
-						shift += count;
-
-					}
-
-				}
-
-			 } else {
-
-				// raw pixels
-
-				pixel_data = data.subarray(
-					 offset, offset += ( use_pal ? header.width * header.height : pixel_total )
-				);
-
-			 }
-
-			 return {
-				pixel_data: pixel_data,
-				palettes: palettes
-			 };
-
-		}
-
-		function tgaGetImageData8bits( imageData, y_start, y_step, y_end, x_start, x_step, x_end, image, palettes ) {
-
-			var colormap = palettes;
-			var color, i = 0, x, y;
-			var width = header.width;
-
-			for ( y = y_start; y !== y_end; y += y_step ) {
-
-				for ( x = x_start; x !== x_end; x += x_step, i ++ ) {
-
-					color = image[ i ];
-					imageData[ ( x + width * y ) * 4 + 3 ] = 255;
-					imageData[ ( x + width * y ) * 4 + 2 ] = colormap[ ( color * 3 ) + 0 ];
-					imageData[ ( x + width * y ) * 4 + 1 ] = colormap[ ( color * 3 ) + 1 ];
-					imageData[ ( x + width * y ) * 4 + 0 ] = colormap[ ( color * 3 ) + 2 ];
-
-				}
-
-			}
-
-			return imageData;
-
-		}
-
-		function tgaGetImageData16bits( imageData, y_start, y_step, y_end, x_start, x_step, x_end, image ) {
-
-			var color, i = 0, x, y;
-			var width = header.width;
-
-			for ( y = y_start; y !== y_end; y += y_step ) {
-
-				for ( x = x_start; x !== x_end; x += x_step, i += 2 ) {
-
-					color = image[ i + 0 ] + ( image[ i + 1 ] << 8 ); // Inversed ?
-					imageData[ ( x + width * y ) * 4 + 0 ] = ( color & 0x7C00 ) >> 7;
-					imageData[ ( x + width * y ) * 4 + 1 ] = ( color & 0x03E0 ) >> 2;
-					imageData[ ( x + width * y ) * 4 + 2 ] = ( color & 0x001F ) >> 3;
-					imageData[ ( x + width * y ) * 4 + 3 ] = ( color & 0x8000 ) ? 0 : 255;
-
-				}
-
-			}
-
-			return imageData;
-
-		}
-
-		function tgaGetImageData24bits( imageData, y_start, y_step, y_end, x_start, x_step, x_end, image ) {
-
-			var i = 0, x, y;
-			var width = header.width;
-
-			for ( y = y_start; y !== y_end; y += y_step ) {
-
-				for ( x = x_start; x !== x_end; x += x_step, i += 3 ) {
-
-					imageData[ ( x + width * y ) * 4 + 3 ] = 255;
-					imageData[ ( x + width * y ) * 4 + 2 ] = image[ i + 0 ];
-					imageData[ ( x + width * y ) * 4 + 1 ] = image[ i + 1 ];
-					imageData[ ( x + width * y ) * 4 + 0 ] = image[ i + 2 ];
-
-				}
-
-			}
-
-			return imageData;
-
-		}
-
-		function tgaGetImageData32bits( imageData, y_start, y_step, y_end, x_start, x_step, x_end, image ) {
-
-			var i = 0, x, y;
-			var width = header.width;
-
-			for ( y = y_start; y !== y_end; y += y_step ) {
-
-				for ( x = x_start; x !== x_end; x += x_step, i += 4 ) {
-
-					imageData[ ( x + width * y ) * 4 + 2 ] = image[ i + 0 ];
-					imageData[ ( x + width * y ) * 4 + 1 ] = image[ i + 1 ];
-					imageData[ ( x + width * y ) * 4 + 0 ] = image[ i + 2 ];
-					imageData[ ( x + width * y ) * 4 + 3 ] = image[ i + 3 ];
-
-				}
-
-			}
-
-			return imageData;
-
-		}
-
-		function tgaGetImageDataGrey8bits( imageData, y_start, y_step, y_end, x_start, x_step, x_end, image ) {
-
-			var color, i = 0, x, y;
-			var width = header.width;
-
-			for ( y = y_start; y !== y_end; y += y_step ) {
-
-				for ( x = x_start; x !== x_end; x += x_step, i ++ ) {
-
-					color = image[ i ];
-					imageData[ ( x + width * y ) * 4 + 0 ] = color;
-					imageData[ ( x + width * y ) * 4 + 1 ] = color;
-					imageData[ ( x + width * y ) * 4 + 2 ] = color;
-					imageData[ ( x + width * y ) * 4 + 3 ] = 255;
-
-				}
-
-			}
-
-			return imageData;
-
-		}
-
-		function tgaGetImageDataGrey16bits( imageData, y_start, y_step, y_end, x_start, x_step, x_end, image ) {
-
-			var i = 0, x, y;
-			var width = header.width;
-
-			for ( y = y_start; y !== y_end; y += y_step ) {
-
-				for ( x = x_start; x !== x_end; x += x_step, i += 2 ) {
-
-					imageData[ ( x + width * y ) * 4 + 0 ] = image[ i + 0 ];
-					imageData[ ( x + width * y ) * 4 + 1 ] = image[ i + 0 ];
-					imageData[ ( x + width * y ) * 4 + 2 ] = image[ i + 0 ];
-					imageData[ ( x + width * y ) * 4 + 3 ] = image[ i + 1 ];
-
-				}
-
-			}
-
-			return imageData;
-
-		}
-
-		function getTgaRGBA( data, width, height, image, palette ) {
-
-			var x_start,
-				y_start,
-				x_step,
-				y_step,
-				x_end,
-				y_end;
-
-			switch ( ( header.flags & TGA_ORIGIN_MASK ) >> TGA_ORIGIN_SHIFT ) {
-
-				default:
-				case TGA_ORIGIN_UL:
-					x_start = 0;
-					x_step = 1;
-					x_end = width;
-					y_start = 0;
-					y_step = 1;
-					y_end = height;
-					break;
-
-				case TGA_ORIGIN_BL:
-					x_start = 0;
-					x_step = 1;
-					x_end = width;
-					y_start = height - 1;
-					y_step = - 1;
-					y_end = - 1;
-					break;
-
-				case TGA_ORIGIN_UR:
-					x_start = width - 1;
-					x_step = - 1;
-					x_end = - 1;
-					y_start = 0;
-					y_step = 1;
-					y_end = height;
-					break;
-
-				case TGA_ORIGIN_BR:
-					x_start = width - 1;
-					x_step = - 1;
-					x_end = - 1;
-					y_start = height - 1;
-					y_step = - 1;
-					y_end = - 1;
-					break;
-
-			}
-
-			if ( use_grey ) {
-
-				switch ( header.pixel_size ) {
-
-					case 8:
-						tgaGetImageDataGrey8bits( data, y_start, y_step, y_end, x_start, x_step, x_end, image );
-						break;
-
-					case 16:
-						tgaGetImageDataGrey16bits( data, y_start, y_step, y_end, x_start, x_step, x_end, image );
-						break;
-
-					default:
-						console.error( 'THREE.TGALoader: Format not supported.' );
-						break;
-
-				}
-
-			} else {
-
-				switch ( header.pixel_size ) {
-
-					case 8:
-						tgaGetImageData8bits( data, y_start, y_step, y_end, x_start, x_step, x_end, image, palette );
-						break;
-
-					case 16:
-						tgaGetImageData16bits( data, y_start, y_step, y_end, x_start, x_step, x_end, image );
-						break;
-
-					case 24:
-						tgaGetImageData24bits( data, y_start, y_step, y_end, x_start, x_step, x_end, image );
-						break;
-
-					case 32:
-						tgaGetImageData32bits( data, y_start, y_step, y_end, x_start, x_step, x_end, image );
-						break;
-
-					default:
-						console.error( 'THREE.TGALoader: Format not supported.' );
-						break;
-
-				}
-
-			}
-
-			// Load image data according to specific method
-			// var func = 'tgaGetImageData' + (use_grey ? 'Grey' : '') + (header.pixel_size) + 'bits';
-			// func(data, y_start, y_step, y_end, x_start, x_step, x_end, width, image, palette );
-			return data;
-
-		}
-
-		// TGA constants
-
-		var TGA_TYPE_NO_DATA = 0,
-			TGA_TYPE_INDEXED = 1,
-			TGA_TYPE_RGB = 2,
-			TGA_TYPE_GREY = 3,
-			TGA_TYPE_RLE_INDEXED = 9,
-			TGA_TYPE_RLE_RGB = 10,
-			TGA_TYPE_RLE_GREY = 11,
-
-			TGA_ORIGIN_MASK = 0x30,
-			TGA_ORIGIN_SHIFT = 0x04,
-			TGA_ORIGIN_BL = 0x00,
-			TGA_ORIGIN_BR = 0x01,
-			TGA_ORIGIN_UL = 0x02,
-			TGA_ORIGIN_UR = 0x03;
-
-		if ( buffer.length < 19 ) console.error( 'THREE.TGALoader: Not enough data to contain header.' );
-
-		var content = new Uint8Array( buffer ),
-			offset = 0,
-			header = {
-				id_length: content[ offset ++ ],
-				colormap_type: content[ offset ++ ],
-				image_type: content[ offset ++ ],
-				colormap_index: content[ offset ++ ] | content[ offset ++ ] << 8,
-				colormap_length: content[ offset ++ ] | content[ offset ++ ] << 8,
-				colormap_size: content[ offset ++ ],
-				origin: [
-					content[ offset ++ ] | content[ offset ++ ] << 8,
-					content[ offset ++ ] | content[ offset ++ ] << 8
-				],
-				width: content[ offset ++ ] | content[ offset ++ ] << 8,
-				height: content[ offset ++ ] | content[ offset ++ ] << 8,
-				pixel_size: content[ offset ++ ],
-				flags: content[ offset ++ ]
-			};
-
-		// check tga if it is valid format
-
-		tgaCheckHeader( header );
-
-		if ( header.id_length + offset > buffer.length ) {
-
-			console.error( 'THREE.TGALoader: No data.' );
-
-		}
-
-		// skip the needn't data
-
-		offset += header.id_length;
-
-		// get targa information about RLE compression and palette
-
-		var use_rle = false,
-			use_pal = false,
-			use_grey = false;
-
-		switch ( header.image_type ) {
-
-			case TGA_TYPE_RLE_INDEXED:
-				use_rle = true;
-				use_pal = true;
-				break;
-
-			case TGA_TYPE_INDEXED:
-				use_pal = true;
-				break;
-
-			case TGA_TYPE_RLE_RGB:
-				use_rle = true;
-				break;
-
-			case TGA_TYPE_RGB:
-				break;
-
-			case TGA_TYPE_RLE_GREY:
-				use_rle = true;
-				use_grey = true;
-				break;
-
-			case TGA_TYPE_GREY:
-				use_grey = true;
-				break;
-
-		}
-
-		//
-
-		var useOffscreen = typeof $OffscreenCanvas !== 'undefined';
-
-		var canvas = useOffscreen ? new $OffscreenCanvas( header.width, header.height ) : $document.createElement( 'canvas' );
-		canvas.width = header.width;
-		canvas.height = header.height;
-
-		var context = canvas.getContext( '2d' );
-		var imageData = context.createImageData( header.width, header.height );
-
-		var result = tgaParse( use_rle, use_pal, header, offset, content );
-		getTgaRGBA( imageData.data, header.width, header.height, result.pixel_data, result.palettes );
-
-		context.putImageData( imageData, 0, 0 );
-
-		return canvas;
-
-	}
-
-} );
 
 var ColladaLoader = function ( manager ) {
 
@@ -88090,9 +88146,13 @@ class ThreeSpritePlayer {
   }
 }
 
-const url = new Array(3)
-  .fill('')
-  .map((v, k) => `/imgs/output-${k}.png`);
+// const url: Array<string> = new Array<string>(3).fill('').map((v: string, k: number) => `/imgs/output-${k}.png`);
+
+const url = [
+  'https://s3.ax1x.com/2021/02/26/yx0ObV.png',
+  'https://s3.ax1x.com/2021/02/26/yx0LD0.png',
+  'https://s3.ax1x.com/2021/02/26/yx0Hvn.png',
+];
 
 const tile = {
   url,
@@ -88113,17 +88173,8 @@ class DemoThreeSpritePlayer extends Demo {
 
   async init() {
     const { textureLoader } = this.deps;
-    const tiles = await Promise.all(
-      tile.url.map(url => textureLoader.loadAsync(url)),
-    );
-    const spritePlayer = new ThreeSpritePlayer(
-      tiles,
-      tile.total,
-      tile.row,
-      tile.col,
-      tile.fps,
-      true,
-    );
+    const tiles = await Promise.all(tile.url.map(url => textureLoader.loadAsync(url)));
+    const spritePlayer = new ThreeSpritePlayer(tiles, tile.total, tile.row, tile.col, tile.fps, true);
 
     const geometry = new PlaneGeometry(tile.w, tile.h);
     const material = new MeshBasicMaterial({
@@ -88366,8 +88417,7 @@ class DemoDeviceOrientationControls extends Demo {
     const geometry = new SphereGeometry(500, 60, 40);
     geometry.scale(-1, 1, 1);
     const material = new MeshBasicMaterial({
-      map: await textureLoader.loadAsync('/imgs/360.jpg'),
-      // color: 0x123456
+      map: await textureLoader.loadAsync('https://s3.ax1x.com/2021/02/26/yx0quq.jpg'),
     });
 
     const helperGeometry = new BoxGeometry(100, 100, 100, 4, 4, 4);
@@ -88471,38 +88521,47 @@ Page({
   },
 
   initCanvas(canvas) {
-    PLATFORM.set(new TaobaoPlatform(canvas));
+    try {
+      this.platform = new TaobaoPlatform(canvas);
+      PLATFORM.set(this.platform);
 
-    console.log($window.innerWidth, $window.innerHeight);
-    console.log(canvas.width, canvas.height);
+      console.log($window.innerWidth, $window.innerHeight);
+      console.log(canvas.width, canvas.height);
 
-    const renderer = new WebGL1Renderer({ canvas, antialias: true, alpha: true });
-    const camera = new PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 1000);
-    const scene = new Scene();
-    const clock = new Clock();
-    const gltfLoader = new GLTFLoader();
-    const textureLoader = new TextureLoader();
+      const renderer = new WebGL1Renderer({ canvas, antialias: true, alpha: true });
+      const camera = new PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 1000);
+      const scene = new Scene();
+      const clock = new Clock();
+      const gltfLoader = new GLTFLoader();
+      const textureLoader = new TextureLoader();
 
-    this.deps = { renderer, camera, scene, clock, gltfLoader, textureLoader };
+      this.deps = { renderer, camera, scene, clock, gltfLoader, textureLoader };
 
-    scene.position.z = -3;
-    renderer.outputEncoding = sRGBEncoding;
-    renderer.setPixelRatio($window.devicePixelRatio);
-    renderer.setSize(canvas.width, canvas.height);
+      scene.position.z = -3;
+      renderer.outputEncoding = sRGBEncoding;
+      renderer.setPixelRatio($window.devicePixelRatio);
+      renderer.setSize(canvas.width, canvas.height);
 
-    const render = () => {
-      if (this.disposing) return
-      $requestAnimationFrame(render);
-      _optionalChain$i([(this.currDemo ), 'optionalAccess', _3 => _3.update, 'call', _4 => _4()]);
-      renderer.render(scene, camera);
-    };
+      const render = () => {
+        if (this.disposing) return
+        canvas.requestAnimationFrame(render);
+        _optionalChain$i([(this.currDemo ), 'optionalAccess', _3 => _3.update, 'call', _4 => _4()]);
+        renderer.render(scene, camera);
+      };
 
-    render();
+      render();
+    } catch (error) {
+      my.alert({ content: error + '' });
+    }
+  },
+
+  onTX(e) {
+    // this.platform.dispatchTouchEvent(e)
   },
 
   onUnload() {
     this.disposing = true;
-    _optionalChain$i([(this.currDemo ), 'optionalAccess', _5 => _5.dispose, 'call', _6 => _6()]);
+    _optionalChain$i([this, 'access', _5 => _5.currDemo, 'optionalAccess', _6 => _6.dispose, 'call', _7 => _7()]);
     PLATFORM.dispose();
   }
 });

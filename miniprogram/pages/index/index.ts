@@ -81,38 +81,47 @@ Page({
   },
 
   initCanvas(canvas) {
-    PLATFORM.set(new TaobaoPlatform(canvas));
+    try {
+      this.platform = new TaobaoPlatform(canvas);
+      PLATFORM.set(this.platform);
 
-    console.log(window.innerWidth, window.innerHeight)
-    console.log(canvas.width, canvas.height)
+      console.log(window.innerWidth, window.innerHeight)
+      console.log(canvas.width, canvas.height)
 
-    const renderer = new WebGL1Renderer({ canvas, antialias: true, alpha: true });
-    const camera = new PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 1000);
-    const scene = new Scene();
-    const clock = new Clock();
-    const gltfLoader = new GLTFLoader();
-    const textureLoader = new TextureLoader();
+      const renderer = new WebGL1Renderer({ canvas, antialias: true, alpha: true });
+      const camera = new PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 1000);
+      const scene = new Scene();
+      const clock = new Clock();
+      const gltfLoader = new GLTFLoader();
+      const textureLoader = new TextureLoader();
 
-    this.deps = { renderer, camera, scene, clock, gltfLoader, textureLoader }
+      this.deps = { renderer, camera, scene, clock, gltfLoader, textureLoader };
 
-    scene.position.z = -3;
-    renderer.outputEncoding = sRGBEncoding;
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(canvas.width, canvas.height);
+      scene.position.z = -3;
+      renderer.outputEncoding = sRGBEncoding;
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(canvas.width, canvas.height);
 
-    const render = () => {
-      if (this.disposing) return
-      requestAnimationFrame(render);
-      (this.currDemo as Demo)?.update()
-      renderer.render(scene, camera);
+      const render = () => {
+        if (this.disposing) return
+        canvas.requestAnimationFrame(render);
+        (this.currDemo as Demo)?.update()
+        renderer.render(scene, camera);
+      }
+
+      render()
+    } catch (error) {
+      my.alert({ content: error + '' })
     }
+  },
 
-    render()
+  onTX(e) {
+    // this.platform.dispatchTouchEvent(e)
   },
 
   onUnload() {
     this.disposing = true;
-    (this.currDemo as Demo)?.dispose()
+    this.currDemo?.dispose()
     PLATFORM.dispose()
   }
 })
