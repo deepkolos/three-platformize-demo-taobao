@@ -1,5 +1,10 @@
 {
-  "enableParallelLoader": true,
+  "enableParallelLoader": false,
   "enableEnhancedBuild": true,
-  "miniprogramRoot": "miniprogram"
+  "enableNodeModuleBabelTransform": true,
+  "node_modules_es6_whitelist": [
+    "three-platformize",
+    "three-platformize-demo",
+    "three-sprite-player"
+  ]
 }

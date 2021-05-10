@@ -1,8 +1,8 @@
 // index.ts
-import { $requestAnimationFrame as requestAnimationFrame, $window as window, Clock, PerspectiveCamera, PLATFORM, Scene, sRGBEncoding, TextureLoader, WebGL1Renderer } from 'three-platformize'
+import { $window, Clock, PerspectiveCamera, PLATFORM, Scene, sRGBEncoding, TextureLoader, WebGL1Renderer, Color, BoxGeometry, MeshBasicMaterial, Mesh, PlaneBufferGeometry } from 'three-platformize'
 import { TaobaoPlatform } from 'three-platformize/src/TaobaoPlatform'
 import { GLTFLoader } from 'three-platformize/examples/jsm/loaders/GLTFLoader'
-import { DemoDeps, Demo, DemoGLTFLoader, DemoThreeSpritePlayer, DemoDeviceOrientationControls, DemoRGBELoader, DemoSVGLoader, DemoOBJLoader, DemoMeshOpt, DemoEXRLoader, DemoHDRPrefilterTexture, DemoMTLLoader, DemoLWOLoader, DemoFBXLoader, DemoBVHLoader, DemoColladaLoader, DemoMeshQuantization, DemoTTFLoader, DemoSTLLoader, DemoPDBLoader } from 'three-platformize-demo/src/index'
+import { DemoGLTFLoader, DemoThreeSpritePlayer, DemoDeviceOrientationControls, DemoRGBELoader, DemoSVGLoader, DemoOBJLoader, DemoMeshOpt, DemoEXRLoader, DemoHDRPrefilterTexture, DemoMTLLoader, DemoLWOLoader, DemoFBXLoader, DemoBVHLoader, DemoColladaLoader, DemoMeshQuantization, DemoTTFLoader, DemoSTLLoader, DemoPDBLoader } from 'three-platformize-demo/dist/index'
 
 const DEMO_MAP = {
   // BasisLoader: DemoBasisLoader,
@@ -55,10 +55,18 @@ Page({
 
   onCanvasReady() {
     // @ts-ignore
-    my.createCanvas({
-      id: 'gl',
-      success: canvas => this.initCanvas(canvas),
-    });
+    Promise.all([
+      new Promise(resolve => my.createSelectorQuery().select('.canvas').boundingClientRect().exec(resolve)),
+      new Promise((resolve, reject) => {
+        my.createCanvas({
+          id: 'gl',
+          success: resolve,
+          fail: reject
+        })
+      })
+    ])
+      .then(([res, canvas]) => this.initCanvas(canvas, res[0]))
+      .catch(() => my.alert({ content: '初始canvas失败' }))
   },
 
   onMenuClick() {
@@ -71,25 +79,36 @@ Page({
 
     const { i, item } = e.currentTarget.dataset;
 
-    const demo = new (DEMO_MAP[item])(this.deps) as Demo;
-    await demo.init();
+    try {
+      my.showLoading()
+      const demo = new (DEMO_MAP[item])(this.deps);
+      await demo.init();
 
-    (this.currDemo as Demo)?.dispose()
-    this.currDemo = demo;
-    this.setData({ currItem: i, showMenu: false })
-    this.switchingItem = false
+      this.currDemo && this.currDemo.dispose()
+      this.currDemo = demo;
+      this.setData({ currItem: i, showMenu: false });
+      this.switchingItem = false;
+    } catch (error) {
+      console.error(error)
+      // @ts-ignore
+      my.alert({ content: error + '' })
+    } finally {
+      my.hideLoading()
+    }
   },
 
-  initCanvas(canvas) {
+  initCanvas(canvas, canvasRect) {
     try {
       this.platform = new TaobaoPlatform(canvas);
       PLATFORM.set(this.platform);
 
-      console.log(window.innerWidth, window.innerHeight)
+      console.log($window.innerWidth, $window.innerHeight)
       console.log(canvas.width, canvas.height)
 
-      const renderer = new WebGL1Renderer({ canvas, antialias: true, alpha: true });
-      const camera = new PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 1000);
+      const canW = Math.round(canvasRect.width * 1.01) // 确保填满屏幕
+      const canH = Math.round(canvasRect.height * 1.01)
+      const renderer = new WebGL1Renderer({ canvas, antialias: false, alpha: true });
+      const camera = new PerspectiveCamera(75, canW / canH, 0.1, 1000);
       const scene = new Scene();
       const clock = new Clock();
       const gltfLoader = new GLTFLoader();
@@ -99,29 +118,32 @@ Page({
 
       scene.position.z = -3;
       renderer.outputEncoding = sRGBEncoding;
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(canvas.width, canvas.height);
+      renderer.setPixelRatio($window.devicePixelRatio);
+      renderer.setSize(canW, canH);
+
+      scene.background = new Color(0xffffff);
 
       const render = () => {
         if (this.disposing) return
         canvas.requestAnimationFrame(render);
-        (this.currDemo as Demo)?.update()
+        this.currDemo && this.currDemo.update()
         renderer.render(scene, camera);
       }
 
       render()
     } catch (error) {
+      // @ts-ignore
       my.alert({ content: error + '' })
     }
   },
 
   onTX(e) {
-    // this.platform.dispatchTouchEvent(e)
+    this.platform.dispatchTouchEvent(e)
   },
 
   onUnload() {
     this.disposing = true;
-    this.currDemo?.dispose()
+    this.currDemo && this.currDemo.dispose()
     PLATFORM.dispose()
   }
 })
