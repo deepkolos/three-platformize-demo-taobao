@@ -12,7 +12,7 @@
 
 ## 使用
 
-如果不适用 rollup 做额外打包，新版本小程序开发工具需要在`mini.project.json`增加一下配置
+如果不使用 rollup 做额外打包，新版本小程序开发工具需要在`mini.project.json`增加一下配置
 
 ```json
 {
