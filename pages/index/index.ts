@@ -89,6 +89,7 @@ Page({
       this.setData({ currItem: i, showMenu: false });
       this.switchingItem = false;
     } catch (error) {
+      console.error(error)
       // @ts-ignore
       my.alert({ content: error + ':' + JSON.stringify(error)})
     } finally {
@@ -134,6 +135,7 @@ Page({
 
       render()
     } catch (error) {
+      console.error(error);
       // @ts-ignore
       my.alert({ content: error + ':' + JSON.stringify(error) })
     }

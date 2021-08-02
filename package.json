@@ -4,16 +4,17 @@
     "build": "rollup -c"
   },
   "dependencies": {
-    "@rollup/plugin-node-resolve": "^11.1.0",
-    "@rollup/plugin-sucrase": "^3.1.0",
-    "rollup": "^2.36.2",
-    "rollup-plugin-terser": "^7.0.2",
-    "three-platformize": "^1.0.10",
-    "three-platformize-demo": "^1.0.6",
+    "three-platformize": "^1.129.0",
+    "three-platformize-demo": "^1.0.9",
     "three-sprite-player": "^1.0.4"
   },
   "devDependencies": {
-    "esbuild": "^0.11.20",
-    "rollup-plugin-esbuild": "^4.2.3"
+    "rollup": "^2.36.2",
+    "rollup-plugin-terser": "^7.0.2",
+    "@rollup/plugin-node-resolve": "^13.0.4",
+    "@rollup/plugin-sucrase": "^4.0.0",
+    "esbuild": "^0.12.17",
+    "fast-glob": "^3.2.7",
+    "rollup-plugin-esbuild": "4.2.3"
   }
 }
